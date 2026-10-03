@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android", "web"],
+  "apple": {
+    "modules": ["FoldTransportModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.foldtransport.FoldTransportModule"]
+  }
+}

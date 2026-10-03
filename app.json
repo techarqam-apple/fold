@@ -7,7 +7,14 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocalNetworkUsageDescription": "FoldLink uses the local network to discover and communicate with the other iPhone.",
+        "NSBonjourServices": [
+          "_foldlink._tcp"
+        ]
+      },
+      "bundleIdentifier": "com.techarqam.fold"
     },
     "android": {
       "adaptiveIcon": {
@@ -20,6 +27,11 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "1d50c14f-76a2-498d-93eb-4add7e6ad6f4"
+      }
     }
   }
 }
