@@ -30,8 +30,10 @@ jobs:
         working-directory: ios
         run: pod install
 
-      - name: Build unsigned iOS archive
+      - name: Build unsigned archive
         run: |
+          set -o pipefail
+          mkdir -p build
           xcodebuild \
             -workspace ios/fold.xcworkspace \
             -scheme fold \
@@ -40,7 +42,14 @@ jobs:
             -archivePath "$PWD/build/FoldLink.xcarchive" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            archive
+            archive 2>&1 | tee build/xcodebuild.log
+
+      - name: Upload Xcode build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Xcode-build-log
+          path: build/xcodebuild.log
 
       - name: Package unsigned IPA
         run: |
