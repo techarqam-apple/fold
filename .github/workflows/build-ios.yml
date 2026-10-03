@@ -1,18 +1,28 @@
 name: Build FoldLink iOS
 
 on:
-  workflow_dispatch:
   push:
     branches:
       - main
 
+  workflow_dispatch:
+
 jobs:
   build-ios:
-    runs-on: macos-15
+    runs-on: macos-26
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Show Xcode and Swift
+        run: |
+          xcodebuild -version
+          swift --version
+          node --version
+          npm --version
+          pod --version
+          uname -m
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -24,16 +34,45 @@ jobs:
         run: npm ci
 
       - name: Generate iOS project
-        run: npx expo prebuild --platform ios --clean
+        run: |
+          npx expo prebuild \
+            --platform ios \
+            --clean \
+            --non-interactive
+
+      - name: Verify FoldTransport module
+        run: |
+          echo "========================================"
+          echo "FoldTransport files"
+          echo "========================================"
+
+          find ios -iname "*FoldTransport*" -print
+
+          echo ""
+          echo "========================================"
+          echo "Local module files"
+          echo "========================================"
+
+          find modules/fold-transport \
+            -maxdepth 3 \
+            -type f \
+            -print
 
       - name: Install CocoaPods
         working-directory: ios
-        run: pod install
+        run: |
+          pod install --repo-update
 
-      - name: Build unsigned archive
+      - name: Build unsigned iOS archive
         run: |
           set -o pipefail
+
           mkdir -p build
+
+          echo "========================================"
+          echo "Starting Xcode archive"
+          echo "========================================"
+
           xcodebuild \
             -workspace ios/fold.xcworkspace \
             -scheme fold \
@@ -44,23 +83,77 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             archive 2>&1 | tee build/xcodebuild.log
 
-      - name: Upload Xcode build log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: Xcode-build-log
-          path: build/xcodebuild.log
+          EXIT_CODE=${PIPESTATUS[0]}
+
+          echo ""
+          echo "========================================"
+          echo "XCODEBUILD EXIT CODE: $EXIT_CODE"
+          echo "========================================"
+
+          echo ""
+          echo "========================================"
+          echo "XCODE ERRORS"
+          echo "========================================"
+
+          grep -iE \
+            "error:|fatal error:|clang error|swiftc.*error|Command .* failed|PhaseScriptExecution.*failed" \
+            build/xcodebuild.log || true
+
+          echo ""
+          echo "========================================"
+          echo "END XCODE ERRORS"
+          echo "========================================"
+
+          exit $EXIT_CODE
+
+      - name: Inspect archive
+        if: success()
+        run: |
+          echo "========================================"
+          echo "Archive contents"
+          echo "========================================"
+
+          find build/FoldLink.xcarchive \
+            -maxdepth 5 \
+            -type f \
+            -print
 
       - name: Package unsigned IPA
+        if: success()
         run: |
+          set -e
+
           mkdir -p build/Payload
-          cp -R build/FoldLink.xcarchive/Products/Applications/fold.app build/Payload/fold.app
+
+          cp -R \
+            build/FoldLink.xcarchive/Products/Applications/fold.app \
+            build/Payload/fold.app
+
           cd build
+
           zip -r FoldLink.ipa Payload
 
+          echo ""
+          echo "========================================"
+          echo "IPA CREATED"
+          echo "========================================"
+
+          ls -lh FoldLink.ipa
+
       - name: Upload IPA
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: FoldLink-IPA
           path: build/FoldLink.ipa
           if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload complete Xcode log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Xcode-build-log
+          path: build/xcodebuild.log
+          if-no-files-found: warn
+          retention-days: 7
